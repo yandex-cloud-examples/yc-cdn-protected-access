@@ -169,7 +169,7 @@ resource "yandex_compute_instance" "mywebserver" {
   }
 }
 
-# Создание публичной DNS-Зоны
+# Создание публичной DNS-зоны
 
 resource "yandex_dns_zone" "my-domain-zone" {
   name    = local.domain_zone_name
