@@ -148,7 +148,7 @@ resource "yandex_compute_instance" "mywebserver" {
   name        = local.vm_name
   platform_id = "standard-v2"
   zone        = "ru-central1-b"
- 
+
   resources {
     cores  = "2"
     memory = "2"
@@ -236,7 +236,7 @@ resource "yandex_storage_bucket" "cdn-source" {
   }
 }
 
-# Загрузка в бакет стартовой страницы веб-сайта бакета
+# Загрузка в бакет главной страницы веб-сайта
 
 resource "yandex_storage_object" "index-object" {
   access_key = yandex_iam_service_account_static_access_key.sa-static-key.access_key
@@ -259,10 +259,9 @@ resource "yandex_storage_object" "content-object" {
 # Создание группы источников CDN
 
 resource "yandex_cdn_origin_group" "my-origin-group" {
-  name        = local.origin_gp_name
-
+  name = local.origin_gp_name
   origin {
-      source = "${var.bucket_name}.website.yandexcloud.net"
+    source = "${var.bucket_name}.website.yandexcloud.net"
   }
 }
 
@@ -278,8 +277,8 @@ resource "yandex_cdn_resource" "my-resource" {
     certificate_manager_id = "${data.yandex_cm_certificate.example-com.id}"
   }
   options {
-    custom_host_header  = "${var.bucket_name}.website.yandexcloud.net"
-    secure_key = "${var.secure_key}"
+    custom_host_header    = "${var.bucket_name}.website.yandexcloud.net"
+    secure_key            = "${var.secure_key}"
     enable_ip_url_signing = true
   }
 }
