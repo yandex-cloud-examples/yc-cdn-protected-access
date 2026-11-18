@@ -33,14 +33,15 @@ variable "content_file_path" {
 }
 
 locals {
-  sa_name          = "my-service-account"
-  network_name     = "webserver-network"
-  subnet_name      = "webserver-subnet-ru-central1-e"
-  sg_name          = "webserver-sg"
-  vm_name          = "mywebserver"
-  domain_zone_name = "my-domain-zone"
-  cert_name        = "mymanagedcert"
-  origin_gp_name   = "my-origin-group"
+  availability_zone = "ru-central1-e"
+  sa_name           = "my-service-account"
+  network_name      = "webserver-network"
+  subnet_name       = "webserver-subnet-ru-central1-e"
+  sg_name           = "webserver-sg"
+  vm_name           = "mywebserver"
+  domain_zone_name  = "my-domain-zone"
+  cert_name         = "mymanagedcert"
+  origin_gp_name    = "my-origin-group"
 }
 
 # Настройка провайдера
@@ -56,6 +57,13 @@ terraform {
 
 provider "yandex" {
   folder_id = var.folder_id
+}
+
+# Получение образа LAMP
+
+data "yandex_compute_image" "lamp" {
+  family    = "lamp"
+  folder_id = "standard-images"
 }
 
 # Создание сервисного аккаунта
@@ -86,9 +94,9 @@ resource "yandex_vpc_network" "webserver-network" {
 
 # Создание подсети
 
-resource "yandex_vpc_subnet" "webserver-subnet-e" {
+resource "yandex_vpc_subnet" "webserver-subnet" {
   name           = local.subnet_name
-  zone           = "ru-central1-e"
+  zone           = local.availability_zone
   network_id     = "${yandex_vpc_network.webserver-network.id}"
   v4_cidr_blocks = ["192.168.1.0/24"]
 }
@@ -129,21 +137,12 @@ resource "yandex_vpc_security_group" "webserver-sg" {
   }
 }
 
-# Создание загрузочного диска для ВМ
-
-resource "yandex_compute_disk" "boot-disk" {
-  type     = "network-ssd"
-  zone     = "ru-central1-e"
-  size     = "20"
-  image_id = "fd8jtn9i7e9ha5q25niu"
-}
-
 # Создание ВМ
 
 resource "yandex_compute_instance" "mywebserver" {
   name        = local.vm_name
   platform_id = "standard-v2"
-  zone        = "ru-central1-e"
+  zone        = local.availability_zone
 
   resources {
     cores  = "2"
@@ -151,17 +150,19 @@ resource "yandex_compute_instance" "mywebserver" {
   }
 
   boot_disk {
-    disk_id = yandex_compute_disk.boot-disk.id
+    initialize_params {
+      image_id = data.yandex_compute_image.lamp.id
+    }
   }
 
   network_interface {
-    subnet_id          = "${yandex_vpc_subnet.webserver-subnet-e.id}"
+    subnet_id          = "${yandex_vpc_subnet.webserver-subnet.id}"
     nat                = true
     security_group_ids = ["${yandex_vpc_security_group.webserver-sg.id}"]
   }
 
   metadata = {
-    user-data = "#cloud-config\nusers:\n  - name: yc-user\n    groups: sudo\n    shell: /bin/bash\n    sudo: 'ALL=(ALL) NOPASSWD:ALL'\n    ssh-authorized-keys:\n      - ${file("${var.ssh_key_path}")}"
+    user-data = "#cloud-config\nusers:\n  - name: yc-user\n    groups: sudo\n    shell: /bin/bash\n    sudo: 'ALL=(ALL) NOPASSWD:ALL'\n    ssh_authorized_keys:\n      - ${file("${var.ssh_key_path}")}"
   }
 }
 
@@ -175,7 +176,7 @@ resource "yandex_dns_zone" "my-domain-zone" {
 
 # Создание ресурсной A-записи для веб-сервера
 
-resource "yandex_dns_recordset" "rsА1" {
+resource "yandex_dns_recordset" "rsA1" {
   zone_id = yandex_dns_zone.my-domain-zone.id
   name    = "${yandex_dns_zone.my-domain-zone.zone}"
   type    = "A"
@@ -187,7 +188,7 @@ resource "yandex_dns_recordset" "rsА1" {
 
 resource "yandex_cm_certificate" "le-certificate" {
   name    = local.cert_name
-  domains = [var.domain_name,"${var.subdomain_name}.${var.domain_name}"]
+  domains = [var.domain_name, "${var.subdomain_name}.${var.domain_name}"]
 
   managed {
   challenge_type = "DNS_CNAME"
